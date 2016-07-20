@@ -1,0 +1,106 @@
+SET CENTURY on
+SET DATE TO ymd
+SET TALK OFF
+SET SAFETY OFF
+SET EXACT ON
+SET DEFAULT TO d:\apdongguan
+CLOSE ALL
+SELECT 6
+USE patrackinputhelp
+SELECT 1
+USE patrack
+REPLACE ALL stockqty WITH 0 FOR stockqty=0
+REPLACE ALL orderqty WITH 0 FOR orderqty=0
+REPLACE ALL qtytake WITH 0 FOR qtytake=0
+REPLACE ALL takeshort WITH 0 FOR takeshort=0
+REPLACE ALL qtyin WITH 0 FOR qtyin=0
+REPLACE ALL qtyout WITH 0 FOR qtyout=0
+REPLACE ALL condate1 WITH {^1111/11/11} FOR condate1={}
+REPLACE ALL condate2 WITH {^1111/11/11} FOR condate2={}
+REPLACE ALL condate3 WITH {^1111/11/11} FOR condate3={}
+REPLACE ALL condate4 WITH {^1111/11/11} FOR condate4={}
+REPLACE ALL etd WITH {^1111/11/11} FOR etd={}
+REPLACE ALL taketime WITH {^1111/11/11} FOR taketime={}
+REPLACE ALL qtyindate WITH {^1111/11/11} FOR qtyindate={}
+REPLACE ALL qtyoutdate WITH {^1111/11/11} FOR qtyoutdate={}
+COPY TO patracksum 
+&&COPY TO patracksum FOR !('利用库备'$contract2)
+&&USE pataken EXCLUSIVE
+&&DELETE ALL
+USE patracksum EXCLUSIVE
+&&DELETE FOR '刘名鑫'$note
+&&PACK
+&&APPEND FROM pataken FOR  '刘名鑫'$note
+&&&&&&&&&&&&&&&&&&&&&APPEND FROM pataken
+&&采购单程序要用到patrackorder
+COPY TO patrackorder FOR contract2=f.contract2 
+&&REPLACE ALL orderqty WITH 0 FOR DELETED()=.t.
+&&INDEX on item_no+contract0+contract2 TAG item_no  &&rushmore技术
+&&TOTAL ON item_no+contract0+contract2 TO d:\apdongguan\pamaterial1 FIELDS orderqty,qtyin,qtyout
+&&USE pamaterial1 EXCLUSIVE
+&&REPLACE ALL qty WITH qtyin-qtyout
+&&REPLACE ALL qtyshort WITH qtyin-orderqty
+&&INDEX on item_no TO d:\apdongguan\T
+INDEX on item_no TAG item_no  &&rushmore技术
+TOTAL ON item_no TO d:\apdongguan\pamaterial2 FIELDS orderqty,qtyin,qtyout,qty,qtyshort
+USE pamaterial2 EXCLUSIVE
+REPLACE ALL qty WITH qtyin-qtyout
+&&REPLACE ALL qtyshort WITH qtyin-orderqty
+
+&&&&&&&&当contract2为利用库备时，该字段的orderqty不计入pamaterial的orderqty
+USE patrack
+COPY TO patracksumag FOR !('利用库备'$contract2) 
+USE patracksumag EXCLUSIVE
+&&COPY TO patrackorderag FOR contract2=f.contract2 
+&&INDEX on item_no+contract0+contract2 TAG item_no  &&rushmore技术
+&&TOTAL ON item_no+contract0+contract2 TO d:\apdongguan\pamaterialag1 FIELDS qtyin,qtyout
+&&USE pamaterialag1 EXCLUSIVE
+&&REPLACE ALL qty WITH qtyin-qtyout
+&&REPLACE ALL qtyshort WITH qtyin-orderqty
+INDEX on item_no TAG item_no  &&rushmore技术
+TOTAL ON item_no TO d:\apdongguan\pamaterialag2 FIELDS orderqty
+
+SELECT 2
+USE pamaterialag2
+INDEX on item_no TAG item_no
+SELECT 1
+USE pamaterial2
+SET RELATION TO item_no INTO B
+REPLACE ALL orderqty WITH B.orderqty FOR item_no=B.item_no
+REPLACE ALL qtyshort WITH orderqty-qtyin
+&&&&&&&&当contract2为利用库备时，该字段的orderqty不计入pamaterial的orderqty
+
+&&USE pataken EXCLUSIVE
+&&RECALL ALL
+
+USE patracksum
+COPY TO totalgoodstake1  FIELDS item_no,contract3,conprice3,orderqty,qtytake,moneyneed,takeshort,taketime,moneylimit
+USE d:\apdongguan\totalgoodstake1 EXCLUSIVE
+INDEX on contract3+item_no TAG contract3  &&rushmore技术
+TOTAL ON contract3+item_no TO d:\apdongguan\totalgoodstake FIELDS qtytake
+USE d:\apdongguan\totalgoodstake
+REPLACE ALL takeshort WITH orderqty-qtytake
+
+USE pamaterial2
+COPY TO pamaterial FIELDS item_no,supplier,company,descrip,orderqty,qtyin,qtyout,qty,qtyshort,conprice1,conprice2,conprice3
+USE pamaterial
+COPY TO pamgoodband FOR company='Goodband' TYPE fox2x
+USE patrack
+COPY TO patrackgoodband1  FOR company='Goodband' TYPE fox2x
+USE patrackgoodband1
+SORT TO patrackgoodband2 ON item_no
+USE patrackgoodband2
+COPY TO patrackgoodband  TYPE fox2x
+SELECT 5
+&&USE patrackorder
+&&&&INDEX on item_no TO d:\apdongguan\Torder
+&&INDEX on item_no TAG item_no   &&rushmore技术
+&&TOTAL ON item_no TO d:\apdongguan\pareport1 FIELDS orderqty
+&&USE pareport1
+&&COPY TO pareport FIELDS item_no,descrip,orderqty,contract2,condate2,conprice1,conprice2,conprice3 FOR orderqty>0
+CLOSE ALL
+SET TALK ON
+SET SAFETY ON
+SET EXACT OFF
+RETURN
+CLOSE ALL

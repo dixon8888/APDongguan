@@ -1,0 +1,13 @@
+SET CENTURY on
+SET DATE TO ymd
+SET TALK OFF
+SET SAFETY OFF
+SET EXACT ON
+SET DEFAULT TO d:\apdongguan
+USE pamaterial.dbf EXCLUSIVE
+BROWSE FOR '084902'$item_no OR '084903'$item_no OR  '082165'$item_no OR  '079287'$item_no OR  '085246'$item_no OR '084962'$item_no OR  '098672'$item_no OR '086734'$item_no OR '079827'$item_no OR '010387'$item_no
+CLOSE ALL
+SET TALK ON
+SET SAFETY ON
+SET EXACT OFF
+RETURN

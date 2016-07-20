@@ -1,0 +1,275 @@
+SET CENTURY on
+SET DATE TO ymd
+SET TALK OFF
+SET SAFETY OFF
+
+SET EXACT ON
+SET DEFAULT TO d:\apdongguan
+CLOSE ALL
+
+input "请输入提货日期："  to thrq
+&&日期输入格式：  ctod("2013/02/21")
+
+loXls = Createobject("excel.application")
+bookExcel = loXls.Application.Workbooks.Open("E:\LWG\欧确纳固邦采购事宜\提货文件\欧确纳提货.xls")
+nrows=bookExcel.Worksheets('sheet1')
+UsedRange =nrows.UsedRange
+MyMaxRow=UsedRange.Rows.Count &&有数据的总行数
+MyMaxColumn=UsedRange.Columns.Count &&有数据的总列数
+loXls.Workbooks.Close
+loXls.Quit
+
+oExcel=Createobject("Excel.application")
+oExcel.Workbooks.Open("E:\LWG\欧确纳固邦采购事宜\提货文件\欧确纳提货.xls")
+oExcel.Worksheets("sheet1").Activate
+&&objexcel.worksheets("sheet1").range("a:c").activate
+
+&&&&oExcel.worksheets("sheet1").range("A1").activate
+&&&&oExcel.selection.sort(oExcel.range("A1"),1,,,,,,0, 1, ,1, ,,,) 
+
+USE  patrack
+COPY TO patrackcomp1 FOR !'cancel'$note AND contract2!=' '
+USE patrackcomp1
+INDEX on contract2+item_no+contract0 TAG item_no
+TOTAL ON contract2+item_no+contract0 TO patrackcomp2 FIELDS orderqty,qtytake
+
+USE  pataken
+COPY TO patakenconfirm1 FOR taketime<thrq
+USE patakenconfirm1
+REPLACE ALL qtyshort WITH 0
+INDEX on contract2+item_no+contract0 TAG item_no
+TOTAL ON contract2+item_no+contract0 TO patakenconfirm FIELDS qtytake
+USE patakenconfirm
+REPLACE ALL qtyshort WITH orderqty-qtytake
+CLOSE ALL
+
+SELECT 10
+USE patakenconfirm
+INDEX on contract2+item_no+contract0 TAG item_no
+SELECT 9
+USE patrackcomp2
+SET RELATION TO contract2+item_no+contract0 INTO J
+REPLACE ALL qtytake WITH J.qtyshort FOR contract2=J.contract2 AND item_no=J.item_no AND contract0=J.contract0 AND !('mannual'$note)
+REPLACE ALL note WITH '刘万国' FOR contract2=J.contract2 AND item_no=J.item_no AND contract0=J.contract0 AND !('mannual'$note)
+SET RELATION TO
+
+&&所有与提货有关的计算都用patrackcomp2,不再用patrack,在patrack中再也看不到提货记录了
+&&若要查询提货记录，到pataken中查询
+&&若要查询还剩多少货没提，到patakenconfirm中qtyshort列查询
+&&所有所提货物字段iftake均标注为yes，不再标注为yap
+&&临时提货一定要先打印采购订单，否则在patrackcomp2中无法看到该货物，自然就无法提货
+&&原来是每个要提的货物都要打开表patrack手动修改iftake为yes,还有qtytake及taketime，现在只有临时提货才这样做
+&&临时提货需要打开表patrack手动修改iftake为yes,还有qtytake及taketime,因为临时货物在“欧确纳提货.xls”中并不存在
+&&临时提货很重要，因为往往在某个时刻临时决定提某款货物，这样利用临时提货的方法速度就会较快而不会影响提货清单的输出速度
+&&使用“欧确纳提货.prg”产生“提货清单.xls”文件，过程：
+&&  1  将“欧确纳最新到货.xls”另存为“欧确纳提货.xls”
+&&  2  将 “欧确纳提货.xls” 第N列要提的货标注为“ok”
+&&  3  将 “欧确纳提货.xls” 第O列第二行输入 “=IF(N2="ok",K2,0)”
+&&  4  点击输入公式单元格，在单元格右下角十字线处双击，进行全列计算
+
+USE patrackcomp2
+FOR MyRows=2 TO MyMaxRow
+
+&&EuContract=LEFT(oExcel.cells(MyRows,1).Value,14)
+oExcel.CELLS(MyRows,2).Select &&或eole.Range("A1:E1").Select
+oExcel.Selection.NumberFormatLocal = "@" &&把被选定的单元格设为文本格式
+AurContract=oExcel.cells(MyRows,2).Value
+&&AurContract=STR(AurContract)
+
+oExcel.CELLS(MyRows,4).Select &&或eole.Range("A1:E1").Select
+oExcel.Selection.NumberFormatLocal = "@" &&把被选定的单元格设为文本格式
+AurItem=oExcel.cells(MyRows,4).Value
+
+oExcel.CELLS(MyRows,7).Select &&或eole.Range("A1:E1").Select
+AurQty=oExcel.cells(MyRows,7).Value
+&&AurQty=INT(AurQty)
+
+oExcel.CELLS(MyRows,14).Select &&或eole.Range("A1:E1").Select
+oExcel.Selection.NumberFormatLocal = "@" &&把被选定的单元格设为文本格式
+TakeDecision=oExcel.cells(MyRows,14).Value
+
+oExcel.CELLS(MyRows,15).Select &&或eole.Range("A1:E1").Select
+TakeQty=oExcel.cells(MyRows,15).Value
+&&TakeQty=INT(TakeQty)
+
+IF ALLTRIM(TakeDecision)='ok'
+
+GO top
+LOCATE FOR ALLTRIM(AurContract)$ALLTRIM(contract2) AND (ALLTRIM(item_no)$ALLTRIM(AurItem);
+OR ALLTRIM(AurItem)$ALLTRIM(item_no) OR ALLTRIM(AurItem)=ALLTRIM(item_no) ) AND AurQty=orderqty AND DELETED()=.F. 
+IF FOUND()
+REPLACE iftake WITH 'yes'
+IF !('mannual'$note) AND !('刘万国'$note)
+REPLACE qtytake WITH TakeQty
+ENDIF
+REPLACE taketime WITH thrq
+DELETE
+ENDIF
+
+ENDIF
+NEXT MyRows
+RECALL all
+USE
+
+oExcel.ActiveWorkbook.saved=.T.  &&不保存当前EXCEL表
+oExcel.Workbooks.Close &&关闭表
+oExcel.Quit &&退出EXCEL
+Release oExcel &&释放变量
+&&****************************************************************************************
+SELECT 6
+USE patrackinputhelp
+REPLACE taketime WITH thrq
+SELECT 1
+USE patrackcomp2
+COPY TO goodstake1 FOR iftake='yes' AND taketime=f.taketime FIELDS item_no,contract0,contract2,contract3,conprice3,orderqty,qtytake,moneyneed,takeshort,taketime,moneylimit
+USE d:\apdongguan\goodstake1
+&&INDEX on  contract3 TAG contract3 &&rushmore技术
+SORT TO goodstake4 ON contract3  FIELDS item_no,contract0,contract2,contract3,conprice3,orderqty,qtytake,moneyneed,takeshort,taketime,moneylimit
+USE goodstake4
+REPLACE ALL moneyneed with ROUND(qtytake*conprice3*1.17,2)
+SUM ALL moneyneed TO paymoney
+paymoney = ROUND(paymoney,2)
+&&moneyleft=f.moneylimit-paymoney
+&&COPY TO goodstake2
+&&USE goodstake2
+&&ZAP
+
+COPY TO goodstake3
+USE goodstake3
+ZAP
+CLOSE all
+SELECT 2
+USE d:\apdongguan\goodstake4
+GO bottom
+APPEND BLANK
+GO top
+aa=ALLTRIM(contract3)
+FOR MyCount=1 TO RECCOUNT()
+GO MyCount
+bb=ALLTRIM(contract3)
+IF bb!=aa then
+   CLOSE ALL
+   SELECT 2
+   USE d:\apdongguan\goodstake4
+   COPY TO goodstake2 FOR contract3=aa
+           SELECT 3
+           USE goodstake2
+           SUM ALL moneyneed TO paymoney1
+           SELECT 4
+           USE goodstake3
+           APPEND FROM goodstake2
+           APPEND BLANK
+           GO bottom
+           REPLACE item_no WITH '合同小计：'
+           REPLACE moneylimit WITH paymoney1
+   aa=bb 
+ ENDIF 
+ SELECT 2      
+NEXT MyCount
+
+&&GO bottom
+&&REPLACE  moneylimit WITH moneyleft
+*USE d:\apdongguan\goodstake
+*APPEND FROM d:\apdongguan\goodstake1
+SELECT 4
+oExcel=Createobject("Excel.application")
+oExcel.Workbooks.Open("E:\LWG\欧确纳固邦采购事宜\提货文件\提货清单模板.xls")
+oExcel.Worksheets("sheet1").Activate
+
+&&IF RECCOUNT()<=50 then
+USE goodstake3
+GO top
+MyCount=1
+MyRows=2
+FOR MyCount=1 TO RECCOUNT()
+GO MyCount
+
+oExcel.Cells(1,1).Value=ALLTRIM('订货号')&&给所选单元格覆值
+oExcel.cells(1,2).Value=ALLTRIM('合同编号')
+oExcel.cells(1,3).Value=ALLTRIM('采购单编号')
+oExcel.cells(1,4).Value=ALLTRIM('提货数量')
+oExcel.cells(1,5).Value=ALLTRIM('价格')
+oExcel.cells(1,6).Value=ALLTRIM('合同小计及总计')
+&&oExcel.cells(MyRows,1).Value=MyCount
+oExcel.CELLS(MyRows,1).Select &&或eole.Range("A1:E1").Select
+oExcel.Selection.BorderS(1).LineStyle=1
+oExcel.Selection.BorderS(2).LineStyle=1
+oExcel.Selection.BorderS(3).LineStyle=1
+oExcel.Selection.BorderS(4).LineStyle=1
+oExcel.Selection.NumberFormatLocal = "@" &&把被选定的单元格设为文本格式
+oExcel.Cells(MyRows,1).Value=ALLTRIM(item_no)&&给所选单元格覆值
+
+oExcel.CELLS(MyRows,2).Select &&或eole.Range("A1:E1").Select
+oExcel.Selection.BorderS(1).LineStyle=1
+oExcel.Selection.BorderS(2).LineStyle=1
+oExcel.Selection.BorderS(3).LineStyle=1
+oExcel.Selection.BorderS(4).LineStyle=1
+oExcel.cells(MyRows,2).Value=ALLTRIM(contract3)
+
+oExcel.CELLS(MyRows,3).Select &&或eole.Range("A1:E1").Select
+oExcel.Selection.BorderS(1).LineStyle=1
+oExcel.Selection.BorderS(2).LineStyle=1
+oExcel.Selection.BorderS(3).LineStyle=1
+oExcel.Selection.BorderS(4).LineStyle=1
+oExcel.cells(MyRows,3).Value=ALLTRIM(contract2)
+
+oExcel.CELLS(MyRows,4).Select &&或eole.Range("A1:E1").Select
+oExcel.Selection.BorderS(1).LineStyle=1
+oExcel.Selection.BorderS(2).LineStyle=1
+oExcel.Selection.BorderS(3).LineStyle=1
+oExcel.Selection.BorderS(4).LineStyle=1
+oExcel.cells(MyRows,4).Value=qtytake
+
+oExcel.CELLS(MyRows,5).Select &&或eole.Range("A1:E1").Select
+oExcel.Selection.BorderS(1).LineStyle=1
+oExcel.Selection.BorderS(2).LineStyle=1
+oExcel.Selection.BorderS(3).LineStyle=1
+oExcel.Selection.BorderS(4).LineStyle=1
+oExcel.cells(MyRows,5).Value=moneyneed
+
+oExcel.CELLS(MyRows,6).Select &&或eole.Range("A1:E1").Select
+oExcel.Selection.BorderS(1).LineStyle=1
+oExcel.Selection.BorderS(2).LineStyle=1
+oExcel.Selection.BorderS(3).LineStyle=1
+oExcel.Selection.BorderS(4).LineStyle=1
+oExcel.cells(MyRows,6).Value=moneylimit
+
+MyRows=MyRows+1
+NEXT MyCount
+oExcel.cells(MyRows,5).Value=ALLTRIM('价格总计：')
+oExcel.cells(MyRows,6).Value=paymoney
+&&ELSE
+ &&WAIT WINDOW "不能超过50条记录！"
+&&EXIT
+&&ENDIF
+MyFile='E:\LWG\欧确纳固邦采购事宜\提货文件\'
+SELECT 6
+&&MyFile=MyFile+ALLTRIM(contract3)+ALLTRIM('提货清单')+ALLTRIM(DTOC(taketime))
+MyFile=MyFile+ALLTRIM('提货清单')
+oExcel.ActiveWorkbook.saved=.T.  &&不保存当前EXCEL表
+oExcel.ActiveWorkbook.SaveAs(MyFile,39) &&另存为5.0的Excel，或用43表示95/97格式
+oExcel.Workbooks.Close &&关闭表
+oExcel.Quit &&退出EXCEL
+Release oExcel &&释放变量
+SELECT 6
+USE patrackinputhelp
+&&所有已提货物都放在pataken文件中
+SELECT 7
+USE pataken
+DELETE FOR taketime=f.taketime AND !('刘名鑫'$note)
+PACK
+APPEND FROM patrackcomp2  FOR iftake='yes' AND taketime=f.taketime 
+&&REPLACE ALL qtyshort WITH qtyin-orderqty
+SELECT 6 
+
+&&SELECT 1
+&&USE patrackcomp2
+&&REPLACE ALL iftake WITH 'yap' FOR iftake='yes' AND taketime=f.taketime
+
+&&REPLACE moneylimit WITH moneyleft
+SET TALK ON
+SET SAFETY ON
+SET EXACT OFF
+CLEAR 
+RETURN
+CLOSE ALL

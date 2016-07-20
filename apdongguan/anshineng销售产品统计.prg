@@ -1,0 +1,41 @@
+SET CENTURY on
+SET DATE TO ymd
+SET TALK OFF
+SET SAFETY OFF
+
+SET EXACT ON
+SET DEFAULT TO d:\apdongguan
+CLOSE ALL
+
+USE patrack
+COPY TO patracksale FOR 'Euchner'$supplier AND qtyoutdate>={^2013/01/01}
+USE patracksale
+INDEX on item_no TAG item_no
+TOTAL ON item_no TO patracksale1 FIELDS qtyout
+USE patracksale1
+COPY TO patracksale2 FIELDS item_no,qtyout,qty,qtytake,qtyshort
+SELECT 2
+USE  patracksale2
+salep=(DATE()-{^2013/01/01})/30
+REPLACE ALL qty WITH 0
+REPLACE ALL qtytake WITH 0
+REPLACE ALL qtyshort WITH 0
+REPLACE ALL qty WITH qtyout/salep
+SELECT 3
+USE pamaterial
+INDEX on item_no TAG item_no
+SELECT 2
+USE  patracksale2
+SET RELATION TO item_no INTO C
+REPLACE ALL qtytake WITH C.qty FOR item_no=C.item_no
+REPLACE ALL qtyshort WITH qtytake-qty
+SORT TO  patracksale3 ON qty/d FIELDS item_no,qtyout,qty,qtytake,qtyshort
+USE  patracksale3
+BROWSE
+
+SET TALK ON
+SET SAFETY ON
+SET EXACT OFF
+CLEAR 
+RETURN
+CLOSE ALL
